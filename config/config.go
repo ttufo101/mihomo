@@ -626,6 +626,15 @@ func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
 
 func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
 	config := &Config{}
+	// 本机身份是唯一事实源（release-center.md §13.4）：starland-dataplane 启用时，
+	// 解析阶段先从 /etc/starland/node-identity 注入凭据，后续 ValidateConfig 的
+	// 三字段非空校验才能通过。身份文件不进版本、不由发布中心下发；
+	// 缺失 / 格式错 / 权限不符一律拒绝启动，绝不回退到模板里的值。
+	if rawCfg.StarlandDataPlane.Enabled {
+		if err := starland.ApplyNodeIdentity(&rawCfg.StarlandDataPlane, ""); err != nil {
+			return nil, err
+		}
+	}
 	if err := starland.ValidateConfig(rawCfg.StarlandDataPlane); err != nil {
 		return nil, err
 	}
